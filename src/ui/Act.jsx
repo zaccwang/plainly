@@ -2,16 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { CopyIcon, PhoneIcon, PrinterIcon, ShieldIcon, ArrowRightIcon } from './icons.jsx';
 import { useLang } from '../i18n.jsx';
 import { fillParts } from '../vault.js';
-import { guardText, writeDraft, askSide, askLive } from '../assist.js';
+import { guardText, writeDraft, askSide } from '../assist.js';
 import { LoadingCard, Skeleton, Spinner, TypingBubble } from './Loading.jsx';
 
 // ---------- small icons for the action cards ----------
 const base = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
 const MailIcon = () => (<svg {...base}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" /></svg>);
 const CalendarIcon = () => (<svg {...base}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></svg>);
-const ChatIcon = () => (<svg {...base}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><path d="M8 9h8" /><path d="M8 13h5" /></svg>);
 const FlagIcon = () => (<svg {...base}><path d="M4 22V4" /><path d="M4 4h13l-2 4 2 4H4" /></svg>);
-const CARD_ICON = { email: MailIcon, call: () => <PhoneIcon size={22} />, plan: CalendarIcon, report: FlagIcon, live: ChatIcon };
+const CARD_ICON = { email: MailIcon, call: () => <PhoneIcon size={22} />, plan: CalendarIcon, report: FlagIcon };
 
 /** Placeholder text rendered with real values filled in (green) on this computer. */
 function Filled({ text, map }) {
@@ -152,15 +151,15 @@ function CallView({ d, map }) {
   );
 }
 
-function ReportView({ d }) {
+function ReportView({ d, map }) {
   return (
     <ol className="script" data-testid="draft-body">
       {d.steps.map((s, i) => (
         <li key={i}>
           <span className="num" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}>{i + 1}</span>
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span lang="en" style={{ fontSize: 18 }}>{s.text}</span>
-            {s.meaning && <span style={{ fontSize: 15, color: 'var(--muted)' }}>{s.meaning}</span>}
+            <span lang="en" style={{ fontSize: 18 }}><Filled text={s.text} map={map} /></span>
+            {s.meaning && <span style={{ fontSize: 15, color: 'var(--muted)' }}><Filled text={s.meaning} map={map} /></span>}
           </span>
         </li>
       ))}
@@ -173,7 +172,7 @@ function draftText(kind, d, vault) {
   if (!d) return '';
   if (kind === 'call')
     return [...d.have_ready.map((h) => `${h.label}: ${h.value}`), '', ...d.lines.map((l, i) => `${i + 1}. ${l.text}`)].map((x) => vault.reveal(x)).join('\n');
-  if (kind === 'report') return d.steps.map((s, i) => `${i + 1}. ${s.text}`).join('\n');
+  if (kind === 'report') return d.steps.map((s, i) => vault.reveal(`${i + 1}. ${s.text}`)).join('\n');
   return vault.reveal(d.body);
 }
 
@@ -181,7 +180,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
   const { t, lang } = useLang();
   const { vault } = act;
   const risk = result.data.scam_risk;
-  const kinds = risk === 'high' ? ['report', 'call', 'live'] : ['email', 'call', 'plan', 'live'];
+  const kinds = risk === 'high' ? ['report', 'call'] : ['email', 'call', 'plan'];
   const kind = kinds.includes(act.kind) ? act.kind : kinds[0];
   const entry = act.drafts[kind]; // { data, lang, loading, error, edited }
   const [copied, setCopied] = useState(false);
@@ -195,7 +194,6 @@ export default function Act({ doc, result, act, setAct, onBack }) {
   const ctx = (extra = {}) => ({ redactedLetter: result.redacted, lang, scamRisk: risk, amount: act.amount, ...extra });
 
   const generate = async (k, extra = {}) => {
-    if (k === 'live') return;
     setDraft(k, { loading: true, error: '' });
     try {
       const data = await writeDraft(k, ctx(extra));
@@ -209,7 +207,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
 
   // Write the draft the first time a card is opened, and again if the language changes.
   useEffect(() => {
-    if (kind === 'live' || entry?.loading) return;
+    if (entry?.loading) return;
     if (!entry?.data && !entry?.error) generate(kind);
     else if (entry?.data && entry.lang !== lang) generate(kind);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,7 +223,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
       const openDraft = entry?.edited ? { text: vault.hide(entry.edited).redacted } : entry?.data;
       const r = await askSide(act.side.history, g.redacted, { redactedLetter: result.redacted, lang, draftKind: kind, draft: openDraft });
       let revised = false;
-      if (r.revise && kind !== 'live' && entry?.data) revised = await revise(r.revise);
+      if (r.revise && entry?.data) revised = await revise(r.revise);
       update((a) => ({
         ...a,
         side: {
@@ -236,26 +234,6 @@ export default function Act({ doc, result, act, setAct, onBack }) {
       }));
     } catch (e) {
       update((a) => ({ ...a, side: { ...a.side, busy: false, messages: [...a.side.messages, { role: 'model', text: `${t('act.err')} ${e.message}`, error: true }] } }));
-    }
-  };
-
-  // ---------- live chat ----------
-  const sendLive = async (text) => {
-    const g = await guardText(text, vault);
-    update((a) => ({ ...a, live: { ...a.live, busy: true, messages: [...a.live.messages, { role: 'user', text, hidden: g.hidden }] } }));
-    try {
-      const reply = await askLive(act.live.history, g.redacted, { lang, redactedLetter: act.live.include ? result.redacted : null });
-      update((a) => ({
-        ...a,
-        live: {
-          ...a.live,
-          busy: false,
-          messages: [...a.live.messages, { role: 'model', text: reply }],
-          history: [...a.live.history, { role: 'user', parts: [{ text: g.redacted }] }, { role: 'model', parts: [{ text: reply }] }],
-        },
-      }));
-    } catch (e) {
-      update((a) => ({ ...a, live: { ...a.live, busy: false, messages: [...a.live.messages, { role: 'model', text: `${t('act.err')} ${e.message}`, error: true }] } }));
     }
   };
 
@@ -318,7 +296,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
             })}
           </div>
 
-          {kind !== 'live' ? (
+          {(
             <section className="card draft-card" data-testid="draft">
               <div className="row spread">
                 <h2 style={{ fontSize: 22 }}>{t(headings[kind])}</h2>
@@ -366,7 +344,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
                       {kind === 'email' && <EmailView d={entry.data} map={vault.map} />}
                       {kind === 'plan' && <LetterView d={entry.data} map={vault.map} />}
                       {kind === 'call' && <CallView d={entry.data} map={vault.map} />}
-                      {kind === 'report' && <ReportView d={entry.data} />}
+                      {kind === 'report' && <ReportView d={entry.data} map={vault.map} />}
                     </>
                   )}
                   {meaning && (kind === 'email' || kind === 'plan') && (
@@ -428,40 +406,6 @@ export default function Act({ doc, result, act, setAct, onBack }) {
                 </p>
               )}
             </section>
-          ) : (
-            <section className="card chat-card" aria-label={t('act.live.title')} data-testid="live">
-              <div className="chat-head">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <h2 style={{ fontSize: 22 }}>{t('act.live.title')}</h2>
-                  <span className="muted" style={{ fontSize: 15 }}>{t('act.live.sub')}</span>
-                </div>
-                <label className="include">
-                  <input
-                    type="checkbox"
-                    checked={act.live.include}
-                    data-testid="include-letter"
-                    onChange={(e) => update((a) => ({ ...a, live: { ...a.live, include: e.target.checked } }))}
-                  />
-                  {t('act.live.include')}
-                </label>
-              </div>
-              <Chat
-                big
-                testid="live-chat"
-                map={vault.map}
-                messages={[{ role: 'model', text: t('act.live.hello') }, ...act.live.messages]}
-                busy={act.live.busy}
-                onSend={sendLive}
-                placeholder={t('act.live.ph')}
-                suggestions={act.live.messages.length ? [] : [t('act.live.s1'), t('act.live.s2'), t('act.live.s3')]}
-                footer={
-                  <div className="row spread muted" style={{ fontSize: 13 }}>
-                    <span>{t('act.live.foot')}</span>
-                    <span>{t('act.live.disclaimer')}</span>
-                  </div>
-                }
-              />
-            </section>
           )}
 
           <div className="row spread no-print">
@@ -469,7 +413,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
           </div>
         </div>
 
-        {kind !== 'live' && (
+        {(
           <aside className="card chat-card side-chat no-print" aria-label={t('act.side.title')} data-testid="side">
             <div className="chat-head">
               <h2 style={{ fontSize: 19 }}>{t('act.side.title')}</h2>
@@ -482,7 +426,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
               busy={act.side.busy}
               onSend={sendSide}
               placeholder={t('act.side.ph')}
-              suggestions={act.side.messages.length ? [] : [t('act.side.s1'), t('act.side.s2')]}
+              suggestions={act.side.messages.length ? [] : [t('act.side.s1'), t('act.side.s2'), t('act.side.s3')]}
               footer={<span className="muted" style={{ fontSize: 13 }}>{t('act.side.foot')}</span>}
             />
           </aside>

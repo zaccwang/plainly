@@ -155,3 +155,43 @@ describe('Vault (placeholders shared by letter, drafts and chats)', () => {
     expect(fillParts('[UNKNOWN_9]', v.map)).toEqual([{ text: '[UNKNOWN_9]', filled: false }]);
   });
 });
+
+import { chatFields } from '../src/redact.js';
+
+describe('chatFields (privacy check for chat messages)', () => {
+  const q = 'How do I appeal an insurance denial?';
+  it('does not hide a whole question the model flagged', () => {
+    expect(chatFields(q, [{ text: q, type: 'OTHER', source: 'model' }])).toEqual([]);
+    expect(chatFields(q, [{ text: 'appeal an insurance denial', type: 'OTHER', source: 'model' }])).toEqual([]);
+  });
+  it('keeps real details', () => {
+    const m = 'Someone called Mei-Ling Zhou about account CVMC-8841207 and her Medicare number 1EG4-TE5-MK72';
+    const kept = chatFields(m, [
+      { text: 'Mei-Ling Zhou', type: 'PERSON_NAME', source: 'model' },
+      { text: 'CVMC-8841207', type: 'ACCOUNT_NUMBER', source: 'model' },
+      { text: '1EG4-TE5-MK72', type: 'GOVERNMENT_ID', source: 'rule' },
+    ]);
+    expect(kept.map((f) => f.text)).toEqual(['Mei-Ling Zhou', 'CVMC-8841207', '1EG4-TE5-MK72']);
+  });
+  it('always keeps rule matches, even long ones', () => {
+    expect(chatFields('a@b.co', [{ text: 'a@b.co', type: 'EMAIL', source: 'rule' }])).toHaveLength(1);
+  });
+});
+
+import { plausibleFields } from '../src/redact.js';
+
+describe('plausibleFields', () => {
+  const letter = 'STATEMENT DATE: 10/28/2026\nDate of Birth: 03/14/1952\nPlease pay by 11/27/2026.';
+  it('keeps a real date of birth and drops ordinary dates labelled as birth dates', () => {
+    const kept = plausibleFields(letter, [
+      { text: '10/28/2026', type: 'DATE_OF_BIRTH', source: 'model' },
+      { text: '03/14/1952', type: 'DATE_OF_BIRTH', source: 'model' },
+      { text: '11/27/2026', type: 'DATE_OF_BIRTH', source: 'model' },
+    ]);
+    expect(kept.map((f) => f.text)).toEqual(['03/14/1952']);
+  });
+  it('leaves other types and rule matches alone', () => {
+    const f = [{ text: '10/28/2026', type: 'OTHER', source: 'model' }, { text: '10/28/2026', type: 'DATE_OF_BIRTH', source: 'rule' }];
+    expect(plausibleFields(letter, f)).toHaveLength(2);
+  });
+});

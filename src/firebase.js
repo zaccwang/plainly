@@ -81,7 +81,6 @@ export const localExplainerTiny = getGenerativeModel(ai, {
 // redacted text; schemas and system instructions are set per request.
 export const draftModel = getGenerativeModel(ai, { model: CLOUD_MODEL });
 export const assistModel = getGenerativeModel(ai, { model: CLOUD_MODEL });
-export const liveModel = getGenerativeModel(ai, { model: CLOUD_MODEL });
 
 /** Must be called from a user gesture (button click). */
 export async function warmUpLocalModel(onProgress) {

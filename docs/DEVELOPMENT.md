@@ -23,7 +23,7 @@ photo / text ──▶ ① photo → text on device         ONLY_ON_DEVICE (the 
 | Find personal details | Gemini Nano (`ONLY_ON_DEVICE`) + regex rules | The letter text |
 | Explanation (EN, 中文, ES in one call) | Gemini (`ONLY_IN_CLOUD`) | Redacted text only |
 | Fallback explanation | Gemini Nano (`ONLY_ON_DEVICE`), short English | Redacted text only |
-| Drafts, "Ask Plainly", Live chat | Gemini (cloud) | Redacted text only |
+| Drafts, "Ask Plainly" chat | Gemini (cloud) | Redacted text only (chat messages filtered by `chatFields`) |
 | Chat privacy check | Gemini Nano + regex + known letter values | What the user types |
 
 ## Requirements
@@ -114,7 +114,7 @@ React + Vite. UI components are in `src/ui/`; the logic modules are framework-fr
 | `src/ui/Drop.jsx` | Photo drop zone, paste box, example letters |
 | `src/ui/Review.jsx` | Clickable black bars, "what the cloud will see" preview, hidden/shown counter, manual hide |
 | `src/ui/Understand.jsx` | Explanation, read aloud, print, copy, "How Plainly protected you" panel |
-| `src/ui/Act.jsx` | Step 4: email, call script, payment-plan letter (report + verify call for scams), "Ask Plainly" side chat, Live chat |
+| `src/ui/Act.jsx` | Step 4: email, call script, payment-plan letter (report + verify call for scams), "Ask Plainly" chat (draft edits + general questions) |
 | `src/ui/Loading.jsx` | Spinners, status cards with elapsed time, skeleton lines, typing dots |
 | `src/ui/Eval.jsx` | Developer eval page (`?dev`) |
 | `src/i18n.jsx` | All interface text in English, 中文 and Español, plus the language switch |

@@ -247,20 +247,22 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-testid="draft-body"]')?.innerText.includes('$120'));
     check('payment plan letter uses the monthly amount', true);
 
-    await page.click('[data-kind="live"]');
-    check('live chat replaces the side chat', (await page.locator('[data-testid="side"]').count()) === 0);
-    await page.fill('[data-testid="live-chat-input"]', 'Someone called Mei-Ling Zhou saying her benefits stop today. Real?');
-    await page.click('[data-testid="live-chat-send"]');
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="live-chat"] .msg-model:not(.typing)').length >= 2);
-    const lastLive = await page.evaluate(() => window.__cloudLog.at(-1));
-    check('live chat flags scams and restores the name locally', (await page.locator('[data-testid="live-chat"] .msg-model:not(.typing)').last().innerText()).includes('scam') && (await text(page, '[data-testid="live-chat"]')).includes('Mei-Ling Zhou'));
-    check('live chat leaves the letter out by default', !lastLive.includes('CASCADE VALLEY'));
-    await page.check('[data-testid="include-letter"]');
-    await page.fill('[data-testid="live-chat-input"]', 'What is an EOB?');
-    await page.click('[data-testid="live-chat-send"]');
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="live-chat"] .msg-model:not(.typing)').length >= 3);
-    const withLetter = await page.evaluate(() => window.__cloudLog.at(-1));
-    check('"Include this letter" sends only the hidden version', withLetter.includes('CASCADE VALLEY') && withLetter.includes('[PERSON_NAME_1]'));
+    const sideReplies = () => page.locator('[data-testid="side-chat"] .msg-model:not(.typing)');
+    const ask = async (q) => {
+      const n = await sideReplies().count();
+      await page.fill('[data-testid="side-chat-input"]', q);
+      await page.click('[data-testid="side-chat-send"]');
+      await page.waitForFunction((k) => document.querySelectorAll('[data-testid="side-chat"] .msg-model:not(.typing)').length > k, n);
+      return sideReplies().last().innerText();
+    };
+    const lastUserHidden = () => page.locator('[data-testid="side-chat"] .msg-user-wrap').last().locator('[data-testid="hidden-note"]').count();
+    check('only one chat on the page (no separate live chat)', (await page.locator('[data-testid="side"]').count()) === 1 && (await page.locator('[data-kind="live"]').count()) === 0);
+    const scamReply = await ask('Someone called Mei-Ling Zhou saying her benefits stop today. Real?');
+    check('chat answers general scam questions, name restored locally', scamReply.includes('scam') && scamReply.includes('Mei-Ling Zhou'), scamReply.slice(0, 80));
+    await ask('How do I appeal an insurance denial?');
+    check('a plain question is not hidden, even when single words are flagged', (await lastUserHidden()) === 0);
+    check('the question itself reaches Gemini', (await page.evaluate(() => window.__cloudLog.at(-1))).includes('How do I appeal an insurance denial?'));
+    check('chat sees only the hidden letter', (await page.evaluate(() => window.__cloudLog.at(-1))).includes('[PERSON_NAME_1]'));
 
     const all = await cloud();
     const leaked = SECRETS.filter((s) => all.includes(s));
@@ -285,8 +287,12 @@ try {
     await page.click('[data-testid="next-step"]');
     await page.waitForSelector('[data-testid="draft-body"]');
     const kinds = await page.$$eval('.action-card', (els) => els.map((e) => e.dataset.kind));
-    check('scam letter offers report / verify call / live chat', kinds.join(',') === 'report,call,live', kinds.join(','));
+    check('scam letter offers report / verify call', kinds.join(',') === 'report,call', kinds.join(','));
     check('report checklist shown', (await text(page, '[data-testid="draft-body"]')).includes('reportfraud.ftc.gov'));
+    check('report checklist has no raw placeholders', !/\[[A-Z_]+_\d+\]/.test(await text(page, '[data-testid="draft-body"]')));
+    await page.getByRole('button', { name: 'Is this phone call a scam?' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="side-chat"] .msg-model:not(.typing)').length >= 2);
+    check('suggested question is sent as written', (await page.locator('[data-testid="side-chat"] [data-testid="hidden-note"]').count()) === 0 && (await page.evaluate(() => window.__cloudLog.at(-1))).includes('Is this phone call a scam?'));
     await page.click('[data-kind="call"]');
     await page.waitForSelector('[data-testid="call-note"]');
     check('no Call button for a scam letter', (await page.locator('[data-testid="call-btn"]').count()) === 0);

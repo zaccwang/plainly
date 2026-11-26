@@ -38,10 +38,19 @@ export const localDetector = {
     needLocal();
     await sleep(200);
     const s = SAMPLES.find((x) => prompt.includes(x.text));
+    // Like the real Gemini Nano sometimes does: flag a whole short chat message as one "detail".
+    const typed = prompt.split('LETTER:')[1]?.split('"""')[1]?.trim();
+    // ...or single ordinary words, labelled with whatever type (seen with the real model).
+    const TYPES_CYCLE = ['PERSON_NAME', 'OTHER', 'MEDICAL_DETAIL'];
+    const wordFlags = (typed ?? '')
+      .split(/[^\p{L}]+/u)
+      .filter((w) => w.length >= 2)
+      .map((w, i) => ({ text: w, type: TYPES_CYCLE[i % 3] }));
+    const overFlag = !s && typed && typed.length < 120 ? [{ text: typed, type: 'OTHER' }, ...wordFlags] : [];
     return resp(
       JSON.stringify({
         doc_type: { tax_notice: 'tax_notice', toll_scam: 'utility_or_toll', insurance_eob: 'insurance_eob' }[s?.id] ?? 'medical_bill',
-        sensitive_fields: (s?.pii ?? []).map((t, i) => ({ text: t, type: TYPES[s.id]?.[i] ?? 'OTHER' })),
+        sensitive_fields: s ? s.pii.map((t, i) => ({ text: t, type: TYPES[s.id]?.[i] ?? 'OTHER' })) : overFlag,
         scam_suspected: !!s?.scam,
         scam_signals: s?.scam ? ['24-hour deadline', 'gift card payment', 'unofficial payment link'] : [],
       }),
@@ -214,6 +223,7 @@ export const draftModel = {
           { text: 'Do not pay, click links, or call numbers from the letter.', meaning: m.step },
           { text: 'Check your account on the real organization\'s official website.', meaning: m.step },
           { text: 'Report the letter to the FTC at reportfraud.ftc.gov.', meaning: m.step },
+          { text: `Warn ${name} and other family members about this letter.`, meaning: m.step },
         ],
       };
     }
@@ -229,23 +239,11 @@ export const assistModel = {
         await sleep(250);
         const m = M[langOf(systemInstruction)];
         const revise = /\b(add|mention|change|remove|shorter|formal|include|reword)\b/i.test(msg) ? msg : '';
-        return resp(JSON.stringify({ reply: revise ? m.side : `${m.q} ${m.eob}`, revise_instruction: revise }), "in_cloud");
-      },
-    };
-  },
-};
-
-export const liveModel = {
-  startChat({ history = [], systemInstruction = '' } = {}) {
-    return {
-      async sendMessage(msg) {
-        logCloud(systemInstruction, history, msg);
-        await sleep(250);
-        const m = M[langOf(systemInstruction)];
         const who = msg.match(/\[PERSON_NAME_\d+\]/)?.[0];
-        const text = /scam|suspend|today|gift card/i.test(msg) ? m.live : m.eob;
+        const scam = /scam|suspend|today|gift card/i.test(msg);
         const lead = { en: `${who} should not pay or share any details yet. `, zh: `${who} 先不要付款，也不要透露任何信息。`, es: `${who} no debe pagar ni dar ningún dato todavía. ` }[langOf(systemInstruction)];
-        return resp(who && /scam|suspend|today|gift card/i.test(msg) ? lead + text : text, 'in_cloud');
+        const reply = revise ? m.side : scam ? (who ? lead : '') + m.live : `${m.q} ${m.eob}`;
+        return resp(JSON.stringify({ reply, revise_instruction: revise }), "in_cloud");
       },
     };
   },

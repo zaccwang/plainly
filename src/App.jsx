@@ -177,7 +177,6 @@ export default function App() {
         drafts: {},
         amount: '',
         side: { messages: [], history: [], busy: false },
-        live: { messages: [], history: [], busy: false, include: false },
       });
       setPanelOpen(true);
       go('understand');

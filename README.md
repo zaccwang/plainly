@@ -108,11 +108,9 @@ Click **Take the next step** and choose an action:
 
 Every draft can be adjusted with **Shorter**, **More formal** or **Mention financial hardship**, or edited by hand with **Edit**. Text in green was filled in on your computer.
 
-**Ask Plainly**, on the right, answers questions about the letter and can change the draft for you ("add a line asking about a discount").
+**Ask Plainly**, on the right, is a chat with Gemini. It can change the draft for you ("add a line asking about a discount"), explain the letter, and answer general questions about bills, insurance, benefits and scams ("Is this phone call a scam?"). Names, numbers and other personal details you type are hidden on your computer before the message is sent; ordinary questions go through as written.
 
-**Live chat** is an open chat with Gemini about bills, insurance, benefits and scams. Tick **Include this letter** if you want it to know about your letter; it only gets the hidden version.
-
-![Live chat, with a name hidden before sending](docs/images/6-live-chat.png)
+![Ask Plainly answering a question, with a name hidden before sending](docs/images/6-ask-plainly.png)
 
 In both chats, anything you type is checked on your computer first. If you type a name or a number, it becomes a black bar and a green note says it was hidden before sending.
 

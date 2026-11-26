@@ -1,6 +1,6 @@
 import { localTranscriber, localDetector, explainer, localExplainer, localExplainerTiny } from './backend.js';
 import { TRANSCRIBE_PROMPT, detectPrompt, explainPrompt, localExplainPrompt, expandLocal } from './prompts.js';
-import { ruleDetect, normalizeFields } from './redact.js';
+import { ruleDetect, normalizeFields, plausibleFields } from './redact.js';
 
 export function parseJson(text) {
   const s = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '');
@@ -39,7 +39,7 @@ export async function detectSensitive(text) {
     const j = parseJson(r.response.text());
     const model = (j.sensitive_fields ?? []).map((f) => ({ ...f, source: 'model' }));
     return {
-      fields: normalizeFields(text, [...model, ...rule]),
+      fields: normalizeFields(text, [...plausibleFields(text, model), ...rule]),
       docType: j.doc_type,
       scamSuspected: !!j.scam_suspected,
       scamSignals: j.scam_signals ?? [],

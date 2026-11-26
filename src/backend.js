@@ -34,7 +34,6 @@ if (configError) {
     localExplainerTiny: { generateContent: fail },
     draftModel: { generateContent: fail },
     assistModel: { startChat: () => ({ sendMessage: fail }) },
-    liveModel: { startChat: () => ({ sendMessage: fail }) },
     warmUpLocalModel: fail,
     localAvailability: async () => 'not-configured',
   };
@@ -42,4 +41,4 @@ if (configError) {
 
 export const isMock = useMock;
 export { configError };
-export const { localTranscriber, localDetector, explainer, localExplainer, localExplainerTiny, draftModel, assistModel, liveModel, warmUpLocalModel, localAvailability, CLOUD_MODEL } = backend;
+export const { localTranscriber, localDetector, explainer, localExplainer, localExplainerTiny, draftModel, assistModel, warmUpLocalModel, localAvailability, CLOUD_MODEL } = backend;

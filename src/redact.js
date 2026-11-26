@@ -91,3 +91,53 @@ export function spans(text, fields) {
   }
   return out.sort((a, b) => a.start - b.start);
 }
+
+/**
+ * Privacy check for a short CHAT message (not a letter).
+ * The on-device model over-flags chat text (a whole question, or single ordinary
+ * words like "appeal" or "insurance"). Hiding those sends Gemini a scrambled
+ * message, so in chat a model guess is only kept when it looks like a real detail:
+ * - it contains a digit (IDs, account and phone numbers, dates, street addresses), or
+ * - it is a full name: 2-4 capitalized words, or 2-4 CJK characters, or
+ * - it is a specific medical term (2+ words, or one long word that isn't generic).
+ * Rule matches (numbers, IDs, emails) are always kept, and values already known
+ * from the letter are hidden separately by the Vault.
+ */
+const GENERIC = new Set(
+  'insurance insurer denial denied appeal claim claims bill bills billing medicare medicaid coverage covered benefit benefits payment payments deductible copay premium hospital doctor medical health letter notice scam scams account statement balance refund question questions something anything everything'.split(' '),
+);
+export function chatFields(text, fields) {
+  const len = text.trim().length;
+  return fields.filter((f) => {
+    if (f.source === 'rule') return true;
+    const t = (f.text ?? '').trim();
+    if (!t || t.length > 60 || t.length >= 0.6 * len || /[?？¿]$/.test(t)) return false;
+    const words = t.split(/\s+/).filter(Boolean);
+    if (words.length > 6) return false;
+    if (/\d/.test(t)) return true;
+    if (f.type === 'PERSON_NAME') {
+      const cjk = /^[\u4e00-\u9fff]{2,4}$/.test(t);
+      const latin = words.length >= 2 && words.length <= 4 && words.every((w) => /^[A-Z][\p{L}'’.-]+$/u.test(w));
+      return cjk || latin;
+    }
+    if (f.type === 'MEDICAL_DETAIL') {
+      if (words.some((w) => GENERIC.has(w.toLowerCase()))) return false;
+      return words.length >= 2 || t.length >= 8;
+    }
+    return false; // OTHER, STREET_ADDRESS without a number, etc.
+  });
+}
+
+/**
+ * Drop model guesses that don't fit their line. The on-device model sometimes labels
+ * ordinary dates (statement date, service date, due date) as DATE_OF_BIRTH; only keep
+ * those when the line they appear on actually talks about a birth date.
+ */
+export function plausibleFields(text, fields) {
+  const lines = text.split('\n');
+  const BIRTH = /birth|\bdob\b|born|nacimiento|出生|生日/i;
+  return fields.filter((f) => {
+    if (f.source !== 'model' || f.type !== 'DATE_OF_BIRTH') return true;
+    return lines.some((l) => l.includes(f.text) && BIRTH.test(l));
+  });
+}
