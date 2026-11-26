@@ -218,7 +218,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
   // ---------- side chat ----------
   const sendSide = async (text) => {
     const g = await guardText(text, vault);
-    update((a) => ({ ...a, side: { ...a.side, busy: true, messages: [...a.side.messages, { role: 'user', text, hidden: g.hidden }] } }));
+    update((a) => ({ ...a, side: { ...a.side, busy: true, messages: [...a.side.messages, { role: 'user', text, hidden: g.hidden, kind }] } }));
     try {
       const openDraft = entry?.edited ? { text: vault.hide(entry.edited).redacted } : entry?.data;
       const r = await askSide(act.side.history, g.redacted, { redactedLetter: result.redacted, lang, draftKind: kind, draft: openDraft });
@@ -426,7 +426,7 @@ export default function Act({ doc, result, act, setAct, onBack }) {
               busy={act.side.busy}
               onSend={sendSide}
               placeholder={t('act.side.ph')}
-              suggestions={act.side.messages.length ? [] : [t('act.side.s1'), t('act.side.s2'), t('act.side.s3')]}
+              suggestions={act.side.messages.some((m) => m.kind === kind) ? [] : [1, 2, 3].map((i) => t(`act.side.${kind}.s${i}`))}
               footer={<span className="muted" style={{ fontSize: 13 }}>{t('act.side.foot')}</span>}
             />
           </aside>

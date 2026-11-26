@@ -256,6 +256,11 @@ try {
       return sideReplies().last().innerText();
     };
     const lastUserHidden = () => page.locator('[data-testid="side-chat"] .msg-user-wrap').last().locator('[data-testid="hidden-note"]').count();
+    const sugg = () => page.$$eval('[data-testid="side"] .chip', (els) => els.map((e) => e.innerText.trim()));
+    check('payment plan shows payment-plan suggestions', (await sugg()).includes('How much should I offer per month?'), (await sugg()).join(' | '));
+    await page.click('[data-kind="call"]');
+    check('phone call shows phone-call suggestions', (await sugg()).includes('What should I write down during the call?'), (await sugg()).join(' | '));
+    await page.click('[data-kind="plan"]');
     check('only one chat on the page (no separate live chat)', (await page.locator('[data-testid="side"]').count()) === 1 && (await page.locator('[data-kind="live"]').count()) === 0);
     const scamReply = await ask('Someone called Mei-Ling Zhou saying her benefits stop today. Real?');
     check('chat answers general scam questions, name restored locally', scamReply.includes('scam') && scamReply.includes('Mei-Ling Zhou'), scamReply.slice(0, 80));

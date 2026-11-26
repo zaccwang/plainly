@@ -238,7 +238,7 @@ export const assistModel = {
         logCloud(systemInstruction, history, msg);
         await sleep(250);
         const m = M[langOf(systemInstruction)];
-        const revise = /\b(add|mention|change|remove|shorter|formal|include|reword)\b/i.test(msg) ? msg : '';
+        const revise = /\b(add|agregue|mention|change|remove|shorter|formal|include|reword)\b/i.test(msg) ? msg : '';
         const who = msg.match(/\[PERSON_NAME_\d+\]/)?.[0];
         const scam = /scam|suspend|today|gift card/i.test(msg);
         const lead = { en: `${who} should not pay or share any details yet. `, zh: `${who} 先不要付款，也不要透露任何信息。`, es: `${who} no debe pagar ni dar ningún dato todavía. ` }[langOf(systemInstruction)];
