@@ -6,7 +6,7 @@ Plainly turns medical bills, insurance statements and official letters into a cl
 
 - **Try it:** <https://plainly-d0fa3.web.app>
 - **Try it without any setup** (example data, works in any browser): <https://plainly-d0fa3.web.app/?mock>
-- **Demo video:** <https://youtu.be/FkfFvpsMw_o>
+- **Demo video:** <https://youtu.be/D2QaBvOItmk>
 
 ![Plainly's intro page](docs/images/1-intro.png)
 
